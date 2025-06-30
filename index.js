@@ -8,7 +8,7 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ObjectId, ServerApiVersion } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jwr0f.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -27,6 +27,43 @@ async function run() {
 
     // api rqst
     const eventCollection = client.db("eventDB").collection("events");
+    const userCollection = client.db("eventDB").collection("users");
+
+    app.post("/register", async (req, res) => {
+      try {
+        const { name, email, password, photoURL } = req.body;
+
+        // Check if email already exists
+        const existingUser = await userCollection.findOne({ email });
+
+        if (existingUser) {
+          return res.status(400).send({ message: "Email already registered" });
+        }
+
+        const newUser = {
+          name,
+          email,
+          password,
+          photoURL,
+          createdAt: new Date(),
+        };
+
+        const result = await userCollection.insertOne(newUser);
+
+        res.status(201).send({
+          message: "User registered successfully",
+          userId: result.insertedId,
+        });
+      } catch (error) {
+        console.error("Error saving user:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
+    });
+
+    app.get("/allUsers", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
 
     // app.get("/allEvents", async (req, res) => {
     //   const result = await eventCollection.find().toArray();
@@ -36,7 +73,7 @@ async function run() {
     //   try {
     //     const result = await eventCollection
     //       .find()
-    //       .sort({ dateTime: -1 }) // DESC: সর্বশেষ event আগে আসবে
+    //       .sort({ dateTime: -1 })
     //       .toArray();
     //     res.send(result);
     //   } catch (error) {
