@@ -8,7 +8,7 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const { MongoClient, ObjectId, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jwr0f.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -175,6 +175,39 @@ async function run() {
       const newEvent = req.body;
       const result = await eventCollection.insertOne(newEvent);
       res.send(result);
+    });
+
+    app.patch("/events/join/:id", async (req, res) => {
+      const eventId = req.params.id;
+
+      const updateResult = await eventCollection.updateOne(
+        { _id: new ObjectId(eventId) },
+        { $inc: { attendeeCount: 1 } }
+      );
+
+      if (updateResult.modifiedCount > 0) {
+        res.send({ message: "Successfully joined", modifiedCount: 1 });
+      } else {
+        res.status(404).send({ message: "Event not found" });
+      }
+    });
+
+    // event by email
+    app.get("/eventsByEmail", async (req, res) => {
+      const email = req.query.email;
+
+      try {
+        let query = {};
+        if (email) {
+          query.email = email;
+        }
+
+        const events = await eventCollection.find(query).toArray();
+        res.send(events);
+      } catch (err) {
+        console.error("Failed to fetch events:", err);
+        res.status(500).send({ message: "Server Error" });
+      }
     });
 
     // Send a ping to confirm a successful connection
