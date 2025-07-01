@@ -23,7 +23,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     // api rqst
     const eventCollection = client.db("eventDB").collection("events");
@@ -65,22 +65,6 @@ async function run() {
       res.send(result);
     });
 
-    // app.get("/allEvents", async (req, res) => {
-    //   const result = await eventCollection.find().toArray();
-    //   res.send(result);
-    // });
-    // app.get("/allEvents", async (req, res) => {
-    //   try {
-    //     const result = await eventCollection
-    //       .find()
-    //       .sort({ dateTime: -1 })
-    //       .toArray();
-    //     res.send(result);
-    //   } catch (error) {
-    //     console.error("Error fetching events:", error);
-    //     res.status(500).send({ message: "Internal Server Error" });
-    //   }
-    // });
     app.get("/allEvents", async (req, res) => {
       try {
         const { title, filter } = req.query;
@@ -176,20 +160,28 @@ async function run() {
       const result = await eventCollection.insertOne(newEvent);
       res.send(result);
     });
-
+    // count increse
     app.patch("/events/join/:id", async (req, res) => {
       const eventId = req.params.id;
+      const { email } = req.body;
 
-      const updateResult = await eventCollection.updateOne(
+      const event = await eventCollection.findOne({
+        _id: new ObjectId(eventId),
+      });
+
+      if (event.joinedEmails?.includes(email)) {
+        return res.status(400).send({ message: "User already joined" });
+      }
+
+      const result = await eventCollection.updateOne(
         { _id: new ObjectId(eventId) },
-        { $inc: { attendeeCount: 1 } }
+        {
+          $inc: { attendeeCount: 1 },
+          $addToSet: { joinedEmails: email }, // array to track who joined
+        }
       );
 
-      if (updateResult.modifiedCount > 0) {
-        res.send({ message: "Successfully joined", modifiedCount: 1 });
-      } else {
-        res.status(404).send({ message: "Event not found" });
-      }
+      res.send(result);
     });
 
     // event by email
@@ -251,10 +243,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
